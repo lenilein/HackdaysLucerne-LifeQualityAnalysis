@@ -26,3 +26,5 @@ Contact administration of Lucerne: nadja.vonballmoos@stadtluzern.ch
 - HackdaysLucerne-LifeQualityAnalysis_Arbenz_Koelliker_Wenger (Correlation Matrix & Decision Tree)
 - CityEngagement_vs_Demographics
 - Comments-Analysis-StadtLuzern.ows (Word-Cloud)
+- clustering_personas.html
+- Analyse_Personas.xlsx
