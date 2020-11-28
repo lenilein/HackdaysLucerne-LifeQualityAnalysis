@@ -17,6 +17,7 @@ The city administration is happy to use the results of this challenge to further
 Answers of the online questionnaire (raw data, unpublished)
 Results of the student project
 Results of the (official) population survey 2019: www.lustat.ch/daten?id=26999
+
 Contact administration of Lucerne: nadja.vonballmoos@stadtluzern.ch
 
 # Git-Hub Documentation:
