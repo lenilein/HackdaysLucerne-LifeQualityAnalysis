@@ -1,0 +1,342 @@
+---
+title: "Shape my City: Political participation in Lucerne"
+author: "Marlen Stalder"
+date: "27.11.2020"
+output: pdf_document
+---
+
+Political participation can have a great influence on quality of life. Therefore I want to take a closer look at this subject. Do the demopgraphic factors have an influence on how good people know about possibilities for participation?
+
+The analysis includes the following variables:
+
+*Survey questions*
+
+* Kennen Sie die Möglichkeiten, sich auf städtischer Ebene mit persönlichen Anliegen einzubringen
+* Kennen Sie die Möglichkeiten, sich in städtische Projekte einzubringen?
+* Kennen Sie die Möglichkeiten, städtische Projekte vorzuschlagen?
+
+*Demographics*
+
+* Geschlecht
+* Altersgruppe
+* Quartier 
+* Zuzug
+* Bildung
+* Haushalt
+* Kinder_Schule
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libaries, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(gtable)
+library(tree)
+
+```
+
+# Load data
+
+```{r load data }
+# load data
+df <- read.csv("./cleaned_data.csv", sep=";", header=TRUE)
+
+```
+
+# Prepare data
+
+```{r prepare data, results="hide"}
+
+#rename columns
+df <- df %>% rename(knw.personal.matters = v_316,
+                sat.personal.matters = v_106,
+                knw.participate = v_212,
+                knw.propose = v_365,
+                sat.participate = v_366,
+                sat.propose = v_367,
+                Geschlecht = Sex
+                )
+
+# create subset
+df.small <- select(df, c("Geschlecht", "Altergruppe","Beziehungstatus","Quartier", 
+                         "Zuzug", "Bildung", "HH", "Kinder_Schule", "Erwerb", 
+                         "knw.personal.matters", "knw.participate", "knw.propose", 
+                         "sat.personal.matters", "sat.participate", "sat.propose"))
+
+# have a look at values
+df.small %>% count(knw.personal.matters)
+df.small %>% count(knw.participate)
+df.small %>% count(knw.propose) 
+df.small %>% count(sat.personal.matters)
+df.small %>% count(sat.participate) 
+df.small %>% count(sat.propose)
+
+df.small %>% count(Geschlecht)
+df.small %>% count(Altergruppe)
+df.small %>% count(Quartier) 
+df.small %>% count(Zuzug)
+df.small %>% count(Bildung) 
+df.small %>% count(HH)
+df.small %>% count(Kinder_Schule)
+df.small %>% count(Erwerb)
+
+# delete all rows without an answer 
+df.small <-  df.small[rowSums(df.small == -77 | df.small == 0)==0,,]
+
+# convert all columns to factors
+df.small <- replace(df.small, TRUE, lapply(df.small, factor))
+
+# level names
+Zuzug.levels = c("<2", "2-5", "6-10", "11-15", "16-20", "21-25", ">25")
+Bildung.levels = c("Berufslehre", "Gymnasium", "Hochschule", "Andere")
+Quartier.levels = c("Innenstadt", "Rechte Seeseite", "Linke Seeseite", 
+                    "Rechtes Reussufer", "Linkes Reussufer", "Littau")
+Altergruppe.levels = c("0-9", "10-19", "20-29", "30-39", "40-49", "50-65", "65-84", "85+")
+HH.levels = c("Einpersonenhaushalt", "Elternteil mit Kind(ern)", "Paar ohne Kinder", 
+              "Paar mit Kind(ern)", "anderer Mehrpersonenhaushalt")
+```
+
+
+# Logistic Regression models
+
+For the yes/no questions I appy a logicstic regression model. 
+
+```{r logistic regression model | knw.personal.matters}
+
+lm.knw.personal.matters <- glm(knw.personal.matters ~ Geschlecht + Altergruppe + 
+                                 Beziehungstatus + Quartier + Zuzug + Bildung + 
+                                 HH + Kinder_Schule + Erwerb,
+                               family = "binomial",
+                               data = df.small)
+
+summary(lm.knw.personal.matters)
+```
+**Interpretation**
+
+For the knowledge about ways to communicate personal issues, the most significant variable seems to be, how long a person has lived in the city. This makes sense, since people who have been living in the city for a longer period of time are probably better informed about possibilities of participation.
+
+```{r logistic regression model | knw.participate}
+
+# without Interaction
+lm.knw.participate <- glm(knw.participate ~ Geschlecht + Altergruppe + Beziehungstatus + 
+                            Quartier + Zuzug + Bildung + HH + Kinder_Schule + Erwerb,
+               family = "binomial",
+               data = df.small)
+
+summary(lm.knw.participate)
+```
+
+**Interpretation**
+For the knowledge about possibilities to participate in urban projects, again the *Zuzug* seems to be most significant. Additionally, having an university degree seems to be very important too. This could be the case, because most ot the respondents have an university degree.
+
+```{r logistic regression model | knw.propose}
+
+# without Interaction
+lm.knw.propose <- glm(knw.propose ~ Geschlecht + Altergruppe + Beziehungstatus + 
+                        Quartier + Zuzug + Bildung + HH + Kinder_Schule + Erwerb,
+               family = "binomial",
+               data = df.small)
+
+summary(lm.knw.propose)
+```
+
+
+# Heatmaps
+
+I further analyse the yes/no questions visually with the healp of heatmaps.
+
+## "Kennen Sie Möglichkeiten, um persönliche Anliegen einzubringen?"
+```{r Wissen | Persönliche Anliegen, echo=FALSE, out.width = "50%", fig.align = "center"}
+
+ggplot(df.small, aes(Zuzug, Quartier, fill=knw.personal.matters)) + 
+  geom_tile() +
+  theme_classic() +
+  scale_fill_manual(values=c("#bcc6b9", "#f6a38f"), labels = c("Ja", "Nein")) +
+  scale_x_discrete(labels=Zuzug.levels) +
+  scale_y_discrete(labels=Quartier.levels) +
+  xlab("Zuzug (in Jahren)") +
+  theme(legend.title=element_blank())
+
+ggplot(df.small, aes(Altergruppe, Bildung,fill=knw.personal.matters)) + 
+  geom_tile() +
+  theme_classic() +
+  scale_fill_manual(values=c("#bcc6b9", "#f6a38f"), labels = c("Ja", "Nein")) +
+  scale_x_discrete(labels=Altergruppe.levels) +
+  scale_y_discrete(labels=Bildung.levels) +
+  xlab("Alter (in Jahren)") +
+  theme(legend.position ="none")
+
+ggplot(df.small, aes(Kinder_Schule,HH,fill=knw.personal.matters)) + 
+  geom_tile() +
+  theme_classic() +
+  scale_fill_manual(values=c("#bcc6b9", "#f6a38f"), labels = c("Ja", "Nein")) +
+  scale_x_discrete(labels=c("Ja", "Nein")) +
+  scale_y_discrete(labels=HH.levels) +
+  xlab("Schulpflichtige Kinder") +
+  ylab("Haushalt") +
+  theme(legend.position="none")
+
+
+```
+
+
+## "Kennen Sie Möglichkeiten, sich in städtischen Projekten einzubringen?"
+```{r echo=FALSE, out.width = "50%", fig.align = "center"}
+ggplot(df.small, aes(Zuzug, Quartier, fill=knw.participate)) + 
+  geom_tile() +
+  theme_classic() +
+  scale_fill_manual(values=c("#bcc6b9", "#f6a38f"), labels = c("Ja", "Nein")) +
+  scale_x_discrete(labels=Zuzug.levels) +
+  scale_y_discrete(labels=Quartier.levels) +
+  xlab("Zuzug (in Jahren)") +
+  theme(legend.title=element_blank())
+
+ggplot(df.small, aes(Altergruppe, Bildung, fill=knw.participate)) + 
+  geom_tile() +
+  theme_classic() +
+  scale_fill_manual(values=c("#bcc6b9", "#f6a38f"), labels = c("Ja", "Nein")) +
+  scale_x_discrete(labels=Altergruppe.levels ) +
+  scale_y_discrete(labels=Bildung.levels) +
+  xlab("Alter (in Jahren)") +
+  theme(legend.position="none")
+
+ggplot(df.small, aes(Kinder_Schule,HH,fill=knw.participate)) + 
+  geom_tile() +
+  theme_classic() +
+  scale_fill_manual(values=c("#bcc6b9", "#f6a38f"), labels = c("Ja", "Nein")) +
+  scale_x_discrete(labels=c("Ja", "Nein")) +
+  scale_y_discrete(labels=HH.levels) +
+  xlab("Schulpflichtige Kinder") +
+  ylab("Haushalt") +
+  theme(legend.position="none")
+
+```
+
+## "Kennen Sie Möglichkeiten, städtische Projekte vorzuschlagen?"
+```{r echo=FALSE, out.width = "50%", fig.align = "center"}
+ggplot(df.small, aes(Zuzug, Quartier, fill=knw.propose)) + 
+  geom_tile() +
+  theme_classic()+
+  scale_fill_manual(values=c("#bcc6b9", "#f6a38f"), labels = c("Ja", "Nein")) +
+  scale_x_discrete(labels=Zuzug.levels) +
+  scale_y_discrete(labels=Quartier.levels) +
+  xlab("Alter (in Jahren)") +
+  theme(legend.title=element_blank())
+
+ggplot(df.small, aes(Altergruppe, Bildung, fill=knw.propose)) + 
+  geom_tile() +
+  theme_classic()+
+  scale_fill_manual(values=c("#bcc6b9", "#f6a38f"), labels = c("Ja", "Nein")) +
+  scale_x_discrete(labels=Altergruppe.levels ) +
+  scale_y_discrete(labels=Bildung.levels) +
+  xlab("Zuzug (in Jahren)") +
+  theme(legend.position="none")
+
+ggplot(df.small, aes(Kinder_Schule,HH,fill=knw.propose)) + 
+  geom_tile() +
+  theme_classic() +
+  scale_fill_manual(values=c("#bcc6b9", "#f6a38f"), labels = c("Ja", "Nein")) +
+  scale_x_discrete(labels=c("Ja", "Nein")) +
+  scale_y_discrete(labels=HH.levels) +
+  xlab("Schulpflichtige Kinder") +
+  ylab("Haushalt") +
+  theme(legend.position="none")
+```
+
+
+# Desicion Tree
+
+Desicion Tree for the question *Kennen Sie die Möglichkeiten, sich in städtische Projekte einzubringen?*
+
+```{r train data}
+# create train data set
+set.seed(73)
+ratio <- 0.7
+total <- nrow(df.small)
+
+train <- sample(1:total, as.integer(total * ratio))
+```
+
+```{r}
+
+table(df.small$knw.participate)
+
+set.seed(1234)
+tree.classification.212 <- tree(knw.participate ~ Geschlecht + Altergruppe + 
+                                  Beziehungstatus + Quartier + Zuzug + Bildung + 
+                                  HH + Kinder_Schule + Erwerb,
+                                 data=df.small, subset=train)
+
+summary(tree.classification.212)
+plot(tree.classification.212)
+text(tree.classification.212, pretty=1, cex=0.75)
+```
+
+** Interpretation**
+The model predicts that people who lived less than 16 Years in the city, answer this question with "no".
+Based on the model, the others answer "no", if they don't have an university degree.
+For people without a degree, neighborhood and age seem to play a role.
+
+## Model Testing
+
+To test the performance of this the model, I train the model with a subset and predict the values for rest of the data.
+
+```{r in - and out-of.sample test}
+tree.classification.212.pred <- predict(tree.classification.212, df.small[train,], type="class")
+
+# confusion table to determine classification error on *train data*
+(tree.classification.212.pred.ct <- table(tree.classification.212.pred, 
+                                           df.small[train,]$knw.participate))
+tree.classification.212.pred.correct <- 0
+tree.classification.212.pred.error <- 0
+for (i1 in 1:2) {
+  for (i2 in 1:2) {
+    if (i1 == i2) {
+      tree.classification.212.pred.correct <- tree.classification.212.pred.correct +
+        tree.classification.212.pred.ct[i1,i2]
+    }else{
+     tree.classification.212.pred.error <- tree.classification.212.pred.error + 
+       tree.classification.212.pred.ct[i1,i2]
+    }
+  }
+}
+(tree.classification.212.pred.rate <- tree.classification.212.pred.correct/
+    sum(tree.classification.212.pred.ct)) 
+# portion of correctly classified observations 51.3%
+(tree.classification.212.pred.error <- 1 - tree.classification.212.pred.rate) 
+# train error (pruned): 48.7%
+
+# and on test data --> test error
+tree.classification.212.pred.test <- predict(tree.classification.212, 
+                                              df.small[-train,], type="class")
+# confusion table to determine classification error on *test data*
+(tree.classification.212.pred.test.ct <- table(tree.classification.212.pred.test, 
+                                                df.small[-train,]$knw.participate))
+tree.classification.212.pred.correct <- 0
+tree.classification.212.pred.error <- 0
+for (i1 in 1:2) {
+  for (i2 in 1:2) {
+    if (i1 == i2) {
+      tree.classification.212.pred.correct <- tree.classification.212.pred.correct + 
+        tree.classification.212.pred.test.ct[i1,i2]
+    }else{
+      tree.classification.212.pred.error <- tree.classification.212.pred.error + 
+        tree.classification.212.pred.test.ct[i1,i2]
+    }
+  }
+}
+(tree.classification.212.pred.rate <- tree.classification.212.pred.correct/
+    sum(tree.classification.212.pred.test.ct)) 
+# portion of correctly classified observations 53.0%
+(tree.classification.212.pred.error <- 1 - tree.classification.212.pred.rate) 
+# test error (pruned): 47.0%
+```
+
+In-sample performance: The model assigns about 70 % right. 
+Out-of-sample Performance: The model assigns about 60%. Therefore, the performance of this model is not very good, as it is only slightley better than a 50/50 chance.
+
+
+
