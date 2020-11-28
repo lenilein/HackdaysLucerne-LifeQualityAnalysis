@@ -1,0 +1,380 @@
+---
+title: 'Covariance Matrix & Decision Tree - Qualitfy of Life'
+author: "Valentin Arbenz, Laszlo Kölliker & Matthias Wenger"
+date: "November 27, 2020"
+output:
+  pdf_document: 
+    toc: true 
+    toc_depth: 2
+    number_sections: true
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.height = 4)
+knitr::opts_chunk$set(fig.width = 6)
+```
+
+\pagebreak
+
+# Introduction
+
+For the hackathon challenge at hand we wanted to get a deeper understand about the survey data at hand.
+
+Our intention in this paper is to use different methods and approaches learned to visualize and fit the data with R.
+
+One of the key-questions that we try to answer with the data is:
+
+**"Which factors have a high correlation with the response variable "Lifequalallg" i.e. Life Quality in General?"**
+
+# Preparing the data for analysis
+
+## Loading libraries
+
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(mice)
+library(tidyr)
+library(ggplot2)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(rworldmap)
+library(RColorBrewer)
+library(randomForest)
+library(gbm)
+library(corrgram)
+```
+
+```{r include=FALSE}
+# Getting the working directory
+getwd()
+```
+
+## Loading the csv-file:
+
+```{r warning=FALSE, results='hide'}
+d.life_quality <- read.csv2("Data/cleaned_data.csv", encoding = "UTF-8", header = TRUE, 
+                      na.strings = c("", " ", "-99", "-66", "-77", "NA", "tbd"))
+head(d.life_quality)
+str(d.life_quality, list.len=ncol(d.life_quality))
+```
+
+## Preprocessing & update file:
+
+Deleting survey entries which are not from Lucerne
+
+```{r warning=FALSE, results='hide'}
+d.life_quality.update <- d.life_quality[d.life_quality$Luzerner==1,]
+#drop not relevant columns regarding the correlation matrix
+d.life_quality.update <- select(d.life_quality.update, -lfdn, -lastpage, -quality, -duration, -X)
+                            
+```
+
+Renaming Columns
+
+```{r warning=FALSE}
+d.life_quality.update.1<-d.life_quality.update %>% 
+  rename(
+    Zf_öv_Arbeitsplatz = v_89,
+    Zf_Umgebung_Arbeitsplatz =v_90,
+    Zf_Standortattr_Unternehmen =v_336, 
+    Zf_Standortattr_Innenstadt = v_337,
+    Zf_Standortattr_Quartier = v_338,
+    Zf_Standortattr_CoWorking = v_364,
+    Zf_Wichtigkeit_Läden = v_341,
+    Zf_Gesundheit = v_27, 
+    Zf_Med_Betreuung = v_294,
+    Zf_SicherheitNachts = v_28, 
+    Zf_SicherheitTag = v_197, 
+    Zf_SicherheitZuhause = v_101, 
+    Zf_Wohnsituation1 = v_78, 
+    Zf_Wohnsituation2 = v_79, 
+    Zf_ErreichbarkeittInfrast = v_79, 
+    Zf_PersönlichesEngagement = v_311, 
+    Zf_ÖVDichte = v_49,
+    Zf_ErreichbarkeitÖvWohnung = v_50,
+    Zf_VerbindungStadtzentrum = v_51,
+    Zf_VerbindungNaherholung= v_54,
+    Zf_VerbindungArbeitsplatz= v_53,
+    Zf_MobilitätGrünphase = v_187,
+    Zf_MobilitätSitzbankDichte = v_188,
+    Zf_Veloparkplätze =v_279,
+    Zf_Freizeit = v_55,
+    Zf_Kultur =v_56, 
+    Zf_SicherheitÖv = v_39,
+    Zf_SicherheitAutoMotorrad = v_40,
+    Zf_SicherheitVelo = v_41,
+    Zf_SicherheitFuss = v_42,
+    Zf_Velo_AnbindungÖv = v_323,
+    Zf_AnbindungVelo = v_324,
+    Zf_Bus_AnbindungVelo = v_325,
+    Zf_Vertrauen_StadtVerw = v_126,
+    Zf_Einbringung = v_366,
+    Zf_Einbringung2 = v_367,
+    Zf_Sorgen_Alter1 = v_256,
+    Zf_Sorgen_Alter2 = v_257,
+    Zf_Sorgen_Alter3 = v_258,
+    Zf_Sorgen_Alter4 = v_259,
+    Zf_Sorgen_Alter5 = v_260,
+    Zf_Sorgen_Umwelt1 = v_317,
+    Zf_Sorgen_Umwelt2 = v_318,
+    Zf_Sorgen_Umwelt3 = v_319,
+    Zf_Sorgen_Umwelt4 = v_320,
+    Zf_Sorgen_Umwelt5 = v_321,
+    Zf_Lebensqualität = Lebensqualallg,
+    Zf_Kinder1 =  v_73,
+    Zf_Kinder2 = v_74,
+    Zf_Kinder3 = v_75,
+    Zf_Kinderbetr1 = v_152,
+    Zf_Kinderbetr2 = v_153,
+    Zf_Kinderbetr3 = v_154,
+    Zf_FamilieBeruf1 = v_269,
+    Zf_FamilieBeruf2 = v_274,
+    Zf_FamilieBeruf3 = v_275
+  )
+```
+
+\newpage
+
+Dropping columns with the regEx "v_"
+
+```{r}
+d.life_quality.update.2 <- d.life_quality.update.1[, -grep("v_", colnames(d.life_quality.update.1))]
+```
+
+Checking the structure:
+
+```{r}
+str(d.life_quality.update.2, list.len=ncol(d.life_quality.update.2))
+```
+
+## Exploring NA patterns
+
+```{r results='hide'}
+md.pattern(d.life_quality.update.2, plot = FALSE)
+```
+
+Using the md.pattern command from the mice-package, we can see how much missing values we have in the data.
+
+Since we don`t want NA in the data for our models, we have to get rid of them. Replacing the NA (for example with the mean) does not make much sense here, so we decided to delete the columns with the missing values.
+
+Note that we decided to do this, as we do not want to na.omit() the data as this would reduce the size of the data to 1/3 of its original size.
+Additionally, most often the NAs relate to a question which was not answered. This also includes additional questions based on the initial question.
+
+
+## Drop missing value columns
+
+```{r results='hide'}
+test_data <- select(d.life_quality.update.2, -ArbeitsplatzLuzern, -Zf_Umgebung_Arbeitsplatz, -Zf_Kinder1, -Zf_Kinder2, -Zf_Kinder3, -Zf_Kinderbetr1, -Zf_Kinderbetr2, -Zf_Kinderbetr3, -Zf_FamilieBeruf1, -Zf_FamilieBeruf2, -Zf_FamilieBeruf3)
+
+md.pattern(test_data, plot=FALSE)
+```
+
+After dropping the NA we are now left with a cleaned data-frame containing 630 observations.
+
+\newpage
+
+# Visualizing the data (examples)
+
+## Lebensqualität Allg. vs. Gesundheit
+
+```{r}
+ggplot(data = test_data, aes(x = Zf_Gesundheit, y = Zf_Lebensqualität, color = Zf_Gesundheit, group = Zf_Gesundheit)) +
+  geom_boxplot() +
+  theme_minimal() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  scale_y_continuous(name = "Lebensqualität Allg.", limits = c(0,NA))
+```
+
+In the first plot wee already see some interesting insights. The scale is inverse - meaning the answers rank from 1 to 6, with 1 being the "best" answer.
+It seems that the "worse" the Zufriedenheit in Gesundheit is (meaning 4+ Score), the higher the chance the Lebensqualität Allg. Score drops.
+
+
+## Lebensqualität Allg. vs. Freizeit
+
+```{r}
+ggplot(data = test_data, aes(x = Zf_Freizeit, y = Zf_Lebensqualität, color = Zf_Freizeit, group = Zf_Freizeit)) +
+  geom_boxplot() +
+  theme_minimal() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  scale_y_continuous(name = "Lebensqualität Allg.", limits = c(0,NA))
+```
+
+We also get a certain picture in regards to the Freizeit vs. Lebensqualität Allg. It seems that the less happy the people were with the "Freizeit" topic, the higher the chance the Lebensqualität Allg. Score is reduced.
+
+\newpage
+
+# Fitting models
+
+## Correlation Matrix
+
+To start really simple we fit a correlation matrix to get further insights.
+
+**Attention: We must not forget, that the response variable "ZF_Lebensqualität" correlates negatively, as the rating from the questions is inverse (meaning: 1 is the best, 6 the worst possible answer)**
+
+
+```{r fig1, fig.height = 20, fig.width = 40}
+test_used <- test_data[,grep("Zf", colnames(test_data))]
+
+corrgram_life_quality <- corrgram <- corrgram(test_used, order=TRUE,
+         upper.panel=panel.cor, main="Survey Correlations",
+         cex.labels = 2, label.pos = c(0.5, 0.5)
+         )
+
+
+```
+
+With a first look we see that some variables correlate higher in negative way as others with the response variable "Lebensqualität Allg.", which indicates a higher influence on the response variable. In a next step we will primarily focus on the more relevant factors:
+
+```{r fig2, fig.height = 20, fig.width = 40}
+final_data <- select(test_data, Zf_Lebensqualität, Zf_ErreichbarkeittInfrast, Zf_Freizeit, Zf_Standortattr_Innenstadt, Zf_Kultur, Zf_SicherheitFuss, Zf_SicherheitZuhause, Zf_VerbindungNaherholung, Zf_Standortattr_Quartier, Zf_Wohnsituation1, Zf_Gesundheit, Zf_SicherheitTag, Zf_VerbindungStadtzentrum)
+
+corrgram <- corrgram(final_data, order=TRUE,
+         upper.panel=panel.cor, main="Survey Correlations",
+         cex.labels = 2.5
+         )
+
+```
+
+This correlation matrix showcases that 12 of all the survey factors correlate in a high manner with the "ZF_Lebensqualität".
+The five most impactful variables are:
+
+1) Zf_ErreichbarkeitInfrastruktur
+2) Zf_Freizeit
+3) Zf_Standortattr_Innenstadt
+4) Zf_Kultur
+5) Zf_SicherheitFuss
+
+## Fitting a simple linear model:
+
+```{r}
+lm.life_quality <- lm(Zf_Lebensqualität ~ .,
+               data = final_data)
+summary(lm.life_quality)
+```
+
+Looking at the summary of the linear model, the Zf_ErreichbarkeittInfrast, Zf_Standortattr_Innenstadt & Zf_SicherheitFuss score both have a significant effect on the response variable.
+
+The adjusted R-squared is 0.2054, so about 20% of the variation is described by the model.
+
+## Examining the model diagnostics:
+
+```{r}
+par(mfrow=c(2,2))
+plot(lm.life_quality)
+```
+
+The assumption of normal errors with constant variance does seem to be not fulfilled ("homoscedasticity assumption").
+
+On plot number two (i.e. the Quantile-Quantile plot) there seem to be a slight deviation from the expected line before the -2 quantile.
+
+Plot number three (i.e. the Scale-Location plot) indicates that the variance of the residuals increase with the fitted values. Therefore, we can conclude that the assumptions of this Linear Model are not perfectly fulfilled.
+
+\newpage
+
+# Fit further models
+
+## Regression Tree
+
+For the second model we decided to fit a regression tree. For this we used the rpart-package.
+
+```{r}
+tree.life_quality <- rpart(Zf_Lebensqualität ~ .,
+               data = final_data, method = "anova", control=rpart.control(minsplit = 16))
+prp(tree.life_quality, cex = 0.6)
+```
+
+We decided to implement the minsplit parameter to 16 to also include the ZF_Gesundheit aspect.
+The key-split node is described as "Zf_ErreichbarkeittInfrastruktur".
+
+
+```{r fig3, fig.height = 10, fig.width = 20}
+gbm.life_quality <- gbm(Zf_Lebensqualität ~ .,
+               data = final_data,
+                 distribution="gaussian",n.trees=5000, interaction.depth=12)
+summary(gbm.life_quality)
+```
+
+The boosted model indicates also that Zf_Standortattr_Quartier, Zf_Standortattr_Innenstadt, Zf_SicherheitFuss, Zf_ErreichbarkeittInfrast, Zf_Freizeit have a higher relative influence.
+
+```{r}
+rF.life_quality <- randomForest(Zf_Lebensqualität ~ .,
+               data = final_data)
+print(rF.life_quality) # view results
+importance(rF.life_quality) # importance of each predictor
+```
+The randomForest model indicates that Zf_Standortattr_Innenstadt, Zf_ErreichbarkeittInfrast, Zf_VerbindungStadtzentrum , Zf_Standortattr_Quartier, Zf_Gesundheit have a higher impact on the response variable.
+
+\newpage
+
+# Comparing the different models
+
+## Crossvalidation lm
+
+We use a 10-fold crossvalidation to see how good the linear model performed. We do this with the caret-package.
+
+```{r warning = FALSE}
+set.seed(1)
+train.control.lm <- trainControl(method = "cv", number = 10)
+cv.lm <- train(Zf_Lebensqualität ~ .,
+               data = final_data, 
+               method = "lm", 
+               trControl = train.control.lm)
+print(cv.lm)
+```
+
+With 10-fold cross validation we get a RMSE (Residual Mean Squared Error) of 0.6649 for the linear model. This means that on average the predictions of our linear model deviate from the observations by about 0.6649 score points.
+
+## Crossvalidation tree
+
+The same function is applied for the tree model.
+
+```{r warning = FALSE}
+set.seed(1)
+train.control.tree <- trainControl(method = "cv", number = 10)
+cv.tree <- train(Zf_Lebensqualität ~ .,
+               data = final_data,
+                 method = "rpart",
+                 trControl = train.control.tree)
+print(cv.tree)
+```
+
+For the regression tree we get 0.6985 as the best possible RMSE.
+
+## Results
+
+**LM: RSME 0.6649925**
+
+**Tree: RSME 0.6985636**
+
+It seems that the linear model has a slightly better performance that the regression tree.
+
+
+\newpage
+
+# Conclusion
+
+Having had the opportunity to work with the dataset provided in the context of "Qualitfy of Life in Lucerne" we gained interesting insights in what aspects have a higher impact on the overall "Life Quality Zufriedenheit".
+
+After loading & cleaning (NAs) the data set, we used a linear model (lm) and a regression tree (tree) to answer our hypothesis: **"Which variables have a high correlation with the response variable "Lebensqualität Allg."?"**
+
+As different models sometimes slightly deviate from others, it is nice to see that some patterns emerge:
+
+**1) Zf_ErreichbarkeittInfrast has in all models a higher relative impact and could be use as a 1st split-node.**
+
+**2) Zf_Standortattr_Innenstadt & Zf_Standortattr_Quartier could be used as a direct follow up to the 1st split-node regarding relative relevance.**
+
+**3) Most often in a 3rd split, the impact is shared between Zf_Gesundheit, Zf_Freizeit**
+
+
+The 10-fold crossvalidation concluded:
+
+**LM: RSME 0.6649925**
+
+**Tree: RSME 0.6985636**
+
+Meaning, that the linear model has a slightly (rather minimal) better performance that the regression tree. So if we would do a prediction with given predictors, the response variable could deviate (mean) around ~ 0.6649 score points from the true value.
