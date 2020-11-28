@@ -1,16 +1,19 @@
 ---
 title: "Shape my City: Political participation in Lucerne"
+author: "Marlen Stalder"
+date: "27.11.2020"
 output: pdf_document
 ---
+
+Political participation can have a great influence on quality of life. Therefore I want to take a closer look at this subject. Do the demopgraphic factors have an influence on how good people know about possibilities for participation?
+
+The analysis includes the following variables:
 
 *Survey questions*
 
 * Kennen Sie die Möglichkeiten, sich auf städtischer Ebene mit persönlichen Anliegen einzubringen
 * Kennen Sie die Möglichkeiten, sich in städtische Projekte einzubringen?
 * Kennen Sie die Möglichkeiten, städtische Projekte vorzuschlagen?
-* Wie zufrieden sind Sie mit den Möglichkeiten, Ihre persönlichen Anliegen auf städtischer Ebene einzubringen?
-* Wie zufrieden sind Sie mit den Möglicheiten sich in städtische Projekte einzubringen?
-* Wie zufrieden sind Sie mit den Möglicheiten Projekte vorzuschlagen?
 
 *Demographics*
 
@@ -58,7 +61,10 @@ df <- df %>% rename(knw.personal.matters = v_316,
                 )
 
 # create subset
-df.small <- select(df, c("Geschlecht", "Altergruppe","Beziehungstatus","Quartier", "Zuzug", "Bildung", "HH", "Kinder_Schule", "Erwerb", "knw.personal.matters", "knw.participate", "knw.propose", "sat.personal.matters", "sat.participate", "sat.propose"))
+df.small <- select(df, c("Geschlecht", "Altergruppe","Beziehungstatus","Quartier", 
+                         "Zuzug", "Bildung", "HH", "Kinder_Schule", "Erwerb", 
+                         "knw.personal.matters", "knw.participate", "knw.propose", 
+                         "sat.personal.matters", "sat.participate", "sat.propose"))
 
 # have a look at values
 df.small %>% count(knw.personal.matters)
@@ -86,42 +92,51 @@ df.small <- replace(df.small, TRUE, lapply(df.small, factor))
 # level names
 Zuzug.levels = c("<2", "2-5", "6-10", "11-15", "16-20", "21-25", ">25")
 Bildung.levels = c("Berufslehre", "Gymnasium", "Hochschule", "Andere")
-Quartier.levels = c("Innenstadt", "Rechte Seeseite", "Linke Seeseite", "Rechtes Reussufer", "Linkes Reussufer", "Littau")
+Quartier.levels = c("Innenstadt", "Rechte Seeseite", "Linke Seeseite", 
+                    "Rechtes Reussufer", "Linkes Reussufer", "Littau")
 Altergruppe.levels = c("0-9", "10-19", "20-29", "30-39", "40-49", "50-65", "65-84", "85+")
-HH.levels = c("Einpersonenhaushalt", "Elternteil mit Kind(ern)", "Paar ohne Kinder", "Paar mit Kind(ern)", "anderer Mehrpersonenhaushalt")
+HH.levels = c("Einpersonenhaushalt", "Elternteil mit Kind(ern)", "Paar ohne Kinder", 
+              "Paar mit Kind(ern)", "anderer Mehrpersonenhaushalt")
 ```
 
 
 # Logistic Regression models
 
-For yes/no questions
+For the yes/no questions I appy a logicstic regression model. 
 
 ```{r logistic regression model | knw.personal.matters}
 
-lm.knw.personal.matters <- glm(knw.personal.matters ~ Geschlecht + Altergruppe + Beziehungstatus + Quartier + Zuzug + Bildung + HH + Kinder_Schule + Erwerb,
+lm.knw.personal.matters <- glm(knw.personal.matters ~ Geschlecht + Altergruppe + 
+                                 Beziehungstatus + Quartier + Zuzug + Bildung + 
+                                 HH + Kinder_Schule + Erwerb,
                                family = "binomial",
                                data = df.small)
 
 summary(lm.knw.personal.matters)
 ```
-*Interpretation*
+**Interpretation**
+
+For the knowledge about ways to communicate personal issues, the most significant variable seems to be, how long a person has lived in the city. This makes sense, since people who have been living in the city for a longer period of time are probably better informed about possibilities of participation.
 
 ```{r logistic regression model | knw.participate}
 
 # without Interaction
-lm.knw.participate <- glm(knw.participate ~ Geschlecht + Altergruppe + Beziehungstatus + Quartier + Zuzug + Bildung + HH + Kinder_Schule + Erwerb,
+lm.knw.participate <- glm(knw.participate ~ Geschlecht + Altergruppe + Beziehungstatus + 
+                            Quartier + Zuzug + Bildung + HH + Kinder_Schule + Erwerb,
                family = "binomial",
                data = df.small)
 
 summary(lm.knw.participate)
 ```
 
-
+**Interpretation**
+For the knowledge about possibilities to participate in urban projects, again the *Zuzug* seems to be most significant. Additionally, having an university degree seems to be very important too. This could be the case, because most ot the respondents have an university degree.
 
 ```{r logistic regression model | knw.propose}
 
 # without Interaction
-lm.knw.propose <- glm(knw.propose ~ Geschlecht + Altergruppe + Beziehungstatus + Quartier + Zuzug + Bildung + HH + Kinder_Schule + Erwerb,
+lm.knw.propose <- glm(knw.propose ~ Geschlecht + Altergruppe + Beziehungstatus + 
+                        Quartier + Zuzug + Bildung + HH + Kinder_Schule + Erwerb,
                family = "binomial",
                data = df.small)
 
@@ -129,10 +144,9 @@ summary(lm.knw.propose)
 ```
 
 
-
 # Heatmaps
 
-for yes/no qustions
+I further analyse the yes/no questions visually with the healp of heatmaps.
 
 ## "Kennen Sie Möglichkeiten, um persönliche Anliegen einzubringen?"
 ```{r Wissen | Persönliche Anliegen, echo=FALSE, out.width = "50%", fig.align = "center"}
@@ -233,7 +247,9 @@ ggplot(df.small, aes(Kinder_Schule,HH,fill=knw.propose)) +
 ```
 
 
-# Desicion Trees
+# Desicion Tree
+
+Desicion Tree for the question *Kennen Sie die Möglichkeiten, sich in städtische Projekte einzubringen?*
 
 ```{r train data}
 # create train data set
@@ -244,26 +260,14 @@ total <- nrow(df.small)
 train <- sample(1:total, as.integer(total * ratio))
 ```
 
-
-```{r}
-table(df.small$knw.personal.matters)
-
-set.seed(1234)
-tree.classification.316 <- tree(knw.personal.matters ~ Geschlecht + Altergruppe + Beziehungstatus + Quartier + Zuzug + Bildung + HH + Kinder_Schule + Erwerb,
-                                 data=df.small, subset=train)
-
-summary(tree.classification.316)
-plot(tree.classification.316)
-text(tree.classification.316, pretty=1, cex=0.75)
-```
-
-
 ```{r}
 
 table(df.small$knw.participate)
 
 set.seed(1234)
-tree.classification.212 <- tree(knw.participate ~ Geschlecht + Altergruppe + Beziehungstatus + Quartier + Zuzug + Bildung + HH + Kinder_Schule + Erwerb,
+tree.classification.212 <- tree(knw.participate ~ Geschlecht + Altergruppe + 
+                                  Beziehungstatus + Quartier + Zuzug + Bildung + 
+                                  HH + Kinder_Schule + Erwerb,
                                  data=df.small, subset=train)
 
 summary(tree.classification.212)
@@ -271,6 +275,14 @@ plot(tree.classification.212)
 text(tree.classification.212, pretty=1, cex=0.75)
 ```
 
+** Interpretation**
+The model predicts that people who lived less than 16 Years in the city, answer this question with "no".
+Based on the model, the others answer "no", if they don't have an university degree.
+For people without a degree, neighborhood and age seem to play a role.
+
+## Model Testing
+
+To test the performance of this the model, I train the model with a subset and predict the values for rest of the data.
 
 ```{r in - and out-of.sample test}
 tree.classification.212.pred <- predict(tree.classification.212, df.small[train,], type="class")
@@ -323,7 +335,8 @@ for (i1 in 1:2) {
 # test error (pruned): 47.0%
 ```
 
-Out-of-sample Performance about 60% --> Bad
+In-sample performance: The model assigns about 70 % right. 
+Out-of-sample Performance: The model assigns about 60%. Therefore, the performance of this model is not very good, as it is only slightley better than a 50/50 chance.
 
 
 
