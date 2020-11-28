@@ -1,0 +1,346 @@
+---
+title: "DataChallenge_ShapeMyCity"
+author: "Irma Glatt"
+date: "27 11 2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+In this sub part of the challenge, I want to find out if the answers given in the question "Wie engagiert sind Sie in der Gestaltung des städtischen Lebens?" can be found to be correlated with any of the main demographic factors. Therefore, I use the following variables for my analysis:
+
+Dependent variable: 
+ - v_311: "Wie engagiert sind Sie in der Gestaltung des städtischen Lebens?"
+ 
+Independent variables: 
+ - v_6: Geschlecht (Sex), 
+ - v_22: Altersgruppe (Altersgruppe), 
+ - v_7: Beziehungsstand (Beziehungsstatus), 
+ - v_113: Quartier (Quartier),
+ - v_99: Lebensdauer in Luzern (Zugzug), 
+ - v_142: höchster Bildungsabschluss (Bildung), 
+ - v_14: Art des Haushalts (HH), 
+ - v_158: Schulpflichtige Kinder (Kinder_Schule), 
+ - v_15: Erwerbstätigkeit (Erwerb), 
+ - v_66: Arbeitsplatz in Luzern (ArbeitsplatzLuzern)
+
+
+# Load packages
+
+```{r packages, message=FALSE, warning=FALSE}
+library(nnet) # for multinomial logistic regression
+library(ggplot2)
+library(MASS) # for ordinal logistic regression
+library(tree)
+library(plyr)
+library(naniar)
+library(ggpubr)
+library(ipred)
+library("xlsx")
+library(randomForest)
+```
+
+# Load and prepare data
+
+```{r load and prepare data, message=FALSE}
+df <- read.csv2("./project/HackdaysLucerne-LifeQualityAnalysis/cleaned_data.CSV")
+
+# Excluding all observations with no information about engagement
+df <- df[!(df$v_311==-77),]
+
+# Change unknown datapoints to NA
+df$ArbeitsplatzLuzern[df$ArbeitsplatzLuzern == -77] <- NA
+
+# Convert the variables to factors and ordered factors, respectively.
+df$Engagement <- ordered(df$v_311)
+df$Sex <- as.factor(df$Sex)
+df$Altergruppe <- ordered(df$Altergruppe)
+df$Beziehungstatus <- as.factor(df$Beziehungstatus)
+df$Quartier <- as.factor(df$Quartier)
+df$Bildung <- as.factor(df$Bildung)
+df$HH <- as.factor(df$HH)
+df$Erwerb <- as.factor(df$Erwerb)
+df$ArbeitsplatzLuzern <- as.factor(df$ArbeitsplatzLuzern)
+df$Kinder_Schule <- as.factor(df$Kinder_Schule)
+df$Zuzug <- ordered(df$Zuzug)
+```
+
+# Plotting the data
+
+```{r plots, fig.height=12, fig.width=12}
+
+df1 <- data.frame(table(df$Engagement, df$Sex))
+names(df1) <- c("Engagement", "Sex", "Count")
+
+p1 <- ggplot(data = df1, aes(x=Engagement, y=Count, fill=Sex)) +
+        geom_bar(stat = "identity")
+
+df2 <- data.frame(table(df$Engagement, df$Altergruppe))
+names(df2) <- c("Engagement", "Altergruppe", "Count")
+
+p2 <- ggplot(data = df2, aes(x=Engagement, y=Count, fill=Altergruppe)) +
+        geom_bar(stat = "identity")
+
+df3 <- data.frame(table(df$Engagement, df$Beziehungstatus))
+names(df3) <- c("Engagement", "Beziehungstatus", "Count")
+
+p3 <- ggplot(data = df3, aes(x=Engagement, y=Count, fill=Beziehungstatus)) +
+        geom_bar(stat = "identity")
+
+df4 <- data.frame(table(df$Engagement, df$Quartier))
+names(df4) <- c("Engagement", "Quartier", "Count")
+
+p4 <- ggplot(data = df4, aes(x=Engagement, y=Count, fill=Quartier)) +
+        geom_bar(stat = "identity")
+
+df5 <- data.frame(table(df$Engagement, df$Bildung))
+names(df5) <- c("Engagement", "Bildung", "Count")
+
+p5 <- ggplot(data = df5, aes(x=Engagement, y=Count, fill=Bildung)) +
+        geom_bar(stat = "identity")
+
+df6 <- data.frame(table(df$Engagement, df$HH))
+names(df6) <- c("Engagement", "HH", "Count")
+
+p6 <- ggplot(data = df6, aes(x=Engagement, y=Count, fill=HH)) +
+        geom_bar(stat = "identity")
+
+df7 <- data.frame(table(df$Engagement, df$Kinder_Schule))
+names(df7) <- c("Engagement", "Kinder_Schule", "Count")
+
+p7 <- ggplot(data = df7, aes(x=Engagement, y=Count, fill=Kinder_Schule)) +
+        geom_bar(stat = "identity")
+
+df8 <- data.frame(table(df$Engagement, df$Erwerb))
+names(df8) <- c("Engagement", "Erwerb", "Count")
+
+p8 <- ggplot(data = df8, aes(x=Engagement, y=Count, fill=Erwerb)) +
+        geom_bar(stat = "identity")
+
+df9 <- data.frame(table(df$Engagement, df$ArbeitsplatzLuzern))
+names(df9) <- c("Engagement", "ArbeitsplatzLuzern", "Count")
+
+p9 <- ggplot(data = df9, aes(x=Engagement, y=Count, fill=ArbeitsplatzLuzern)) +
+        geom_bar(stat = "identity")
+
+df10 <- data.frame(table(df$Engagement, df$Zuzug))
+names(df10) <- c("Engagement", "Zuzug", "Count")
+
+p10 <- ggplot(data = df10, aes(x=Engagement, y=Count, fill=Zuzug)) +
+        geom_bar(stat = "identity")
+
+figure <- ggarrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, nrow=4, ncol=3)
+annotate_figure(figure, top = "City Engagement across various Demografic Factors")
+```
+**Interpretation**
+
+Just by looking at the plots, there is no obvious irregularity one can observe, that indicates a special correlation between one of the independent variables and the dependent variable.
+
+# Regression Model
+
+As the dependent variable is an ordered factor, I apply an ordered logicstic regression model. Due to the fact, that the variable *ArbeitsplatzLuzern* has many NA-values, I skip this variable for the following analysis.
+
+```{r Ordinal Logistic Regression Model}
+
+m_olr <- polr(Engagement ~ Sex + Altergruppe + Beziehungstatus + 
+                      Quartier + Zuzug + Bildung  + HH + Kinder_Schule + 
+                      Erwerb, data = df, Hess = TRUE)
+
+summary(m_olr)
+```
+
+**Interpretation**
+
+As there were only used factors in this model, this result gets really hard to interpret... to reduce the complexitiy of the modelinterpretation, I try a logistic regression for binary data by grouping the answers to the "Engagement-Question":
+
+```{r binary logistic regression}
+# Create a second dataset in which the answers to the "Engagement-question" 
+# are put togehter:
+# 1: "eher engagiert" and "sehr engagiert"
+# 0: "weniger engagiert" and "nicht engagiert"
+# Answers with 
+df2 <- df
+df2$Engagement <- as.integer(df2$Engagement)
+df2$Engagement[df2$Engagement == 2] <- 1
+df2$Engagement[df2$Engagement == 3] <- 4
+df2$Engagement[df2$Engagement == 4] <- 0
+df2 <- df2[!(df2$Engagement==5),]
+
+
+glm.df_new <- glm(Engagement ~ Sex + Altergruppe + Beziehungstatus + 
+                    Quartier + Zuzug + Bildung  + HH + Kinder_Schule + Erwerb,
+                  family = "binomial", data = df2)
+
+summary(glm.df_new)
+
+# As link functions are used the interpretation of these coefficients must be adapted. 
+# In particular, we can interpret the conc coefficient by applying the 
+# exponential function.
+exp(coef(glm.df_new))
+```
+**Interpretation**
+
+With this new model, the factors *Zuzug* and *Bildung* are slightly significant. This is in agreement to further sup parts of this challenge.
+
+
+# Classification Tree
+
+```{r classification tree prediction with train and test data}
+
+set.seed(12)
+
+# define model
+tree.classification.df <- tree(Engagement ~ Sex + Altergruppe + Beziehungstatus + 
+                                 Quartier + Zuzug + Bildung + HH + Kinder_Schule + 
+                                 Erwerb + ArbeitsplatzLuzern, data = df)
+
+summary(tree.classification.df)
+plot(tree.classification.df)
+text(tree.classification.df, pretty=1, cex=0.75)
+
+# Setup training and test set
+ratio <- 0.8
+total <- nrow(df)
+train <- sample(1:total, as.integer(total * ratio))
+test = df[-train, ]
+
+tree.classification.df.pred <- predict(tree.classification.df, df[train,], type="class")
+
+# confusion table to determine classification error on *train data*
+(tree.classification.df.pred.ct <- table(tree.classification.df.pred, 
+                                           df[train,]$Engagement))
+tree.classification.df.pred.correct <- 0
+tree.classification.df.pred.error <- 0
+for (i1 in 1:5) {
+  for (i2 in 1:5) {
+    if (i1 == i2) {
+      tree.classification.df.pred.correct <- tree.classification.df.pred.correct +
+        tree.classification.df.pred.ct[i1,i2]
+    }else{
+     tree.classification.df.pred.error <- tree.classification.df.pred.error + 
+       tree.classification.df.pred.ct[i1,i2]
+    }
+  }
+}
+(tree.classification.df.pred.rate <- tree.classification.df.pred.correct/
+    sum(tree.classification.df.pred.ct)) 
+# portion of correctly classified observations 41.1%
+(tree.classification.df.pred.error <- 1 - tree.classification.df.pred.rate) 
+# train error (pruned): 58.9%
+
+# and on test data --> test error
+tree.classification.df.pred.test <- predict(tree.classification.df, 
+                                              df[-train,], type="class")
+# confusion table to determine classification error on *test data*
+(tree.classification.df.pred.test.ct <- table(tree.classification.df.pred.test, 
+                                                df[-train,]$Engagement))
+tree.classification.df.pred.correct <- 0
+tree.classification.df.pred.error <- 0
+for (i1 in 1:5) {
+  for (i2 in 1:5) {
+    if (i1 == i2) {
+      tree.classification.df.pred.correct <- tree.classification.df.pred.correct + 
+        tree.classification.df.pred.test.ct[i1,i2]
+    }else{
+      tree.classification.df.pred.error <- tree.classification.df.pred.error + 
+        tree.classification.df.pred.test.ct[i1,i2]
+    }
+  }
+}
+(tree.classification.df.pred.rate <- tree.classification.df.pred.correct/
+    sum(tree.classification.df.pred.test.ct)) 
+# portion of correctly classified observations 34.9%
+(tree.classification.df.pred.error <- 1 - tree.classification.df.pred.rate) 
+# test error (pruned): 65.1%
+
+```
+
+**Interpretation**
+
+The classification tree uses the variable *Zuzug* as the main separator. In the left main branch - for people living between 0-15 years in Lucerne, the final branches result in responses 4 (nicht engagiert) and 3 (eher weniger engagiert). In the right main branch - representing people that live more than 15 years in Lucerne - the final branches result in the responses 1 (sehr engagiert), 2 (eher engagiert) and 3 (eher weniger engagiert).
+
+So this might be an indication, that the time of living in the city of Lucerne plays a role in the measure of engagement.
+
+However, as the misclassification rate of the tree is quite high (over 50%), the significance of the model is rather low.
+
+```{r bagging}
+
+# Setup training and test set
+set.seed (1)
+
+ratio <- 0.8
+total <- nrow(df)
+train <- sample(1:total, as.integer(total * ratio))
+test = df[-train, ]
+
+# mtry = 12 means that we should use all 9 predictors for each split of the tree, 
+# hence, do bagging (not randomForrest).
+bag.df=randomForest(Engagement ~ Sex + Altergruppe + Beziehungstatus + Quartier + 
+                      Zuzug + Bildung + HH + Kinder_Schule + 
+                      Erwerb, data = df, 
+                    subset=train, mtry=9, importance =TRUE)
+
+print(bag.df)
+
+# How well does the bagged model perform on the test set? 
+yhat.bag = predict(bag.df,newdata=df[-train,])
+plot(yhat.bag, test[,"Engagement"], "main"="Real vs. predicted engagement values")
+abline(0,1)
+
+# Investigating variable importance 
+# importance(bag.df)
+varImpPlot (bag.df, "main"="Importance of variables")
+
+```
+
+**Interpretation**
+
+To improve the previous tree and to make a more reliable prediction I tried bagging. However, with an out-of-bag estimate of error rate of nearly 70%, the model the significance of the model is still rather low. Interestingly however, one of the most important variables is still *Zuzug*.
+
+Finally, lets try again with the summarised responses used already in the binary logistic regression above:
+
+```{r classification tree with summarised responses}
+
+set.seed(12)
+
+# define the column Engagement as factor
+df2$Engagement <- as.factor(df2$Engagement)
+
+ratio <- 0.8
+total <- nrow(df2)
+train <- sample(1:total, as.integer(total * ratio))
+test = df[-train, ]
+
+# define model
+tree.classification.df <- tree(Engagement ~ Sex + Altergruppe + Beziehungstatus + 
+                                 Quartier + Zuzug + Bildung + HH + Kinder_Schule + 
+                                 Erwerb, data = df2)
+
+summary(tree.classification.df)
+plot(tree.classification.df)
+text(tree.classification.df, pretty=1, cex=0.75)
+
+# bagging
+bag.df=randomForest(Engagement ~ Sex + Altergruppe + Beziehungstatus + 
+                      Quartier + Zuzug + Bildung + HH + Kinder_Schule + 
+                      Erwerb, data = df2, 
+                    subset=train, mtry=8, importance =TRUE)
+
+print(bag.df)
+
+# Investigating variable importance 
+# importance(bag.df)
+varImpPlot (bag.df, "main"="Importance of variables")
+
+```
+
+**Interpretation**
+
+With the summarised answers, the tree shows only 6 terminal nodes. The main criteria is again the factor *Zugzug*.
+By applying bagging, one can reduce the out-of-bag estimate of error rate to 40.1%.
