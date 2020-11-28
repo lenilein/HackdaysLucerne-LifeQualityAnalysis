@@ -1,0 +1,265 @@
+---
+title: "lucerne_quality_of_life_clustering"
+author: 'Hackathon HSLU'
+date: "28 November 2020"
+output:
+  html_document: 
+    toc: TRUE
+    toc_float: TRUE
+  pdf_document:
+    toc: TRUE
+---
+
+# Setup
+
+```{r setup, include=FALSE}
+library("knitr")
+knitr::opts_chunk$set(echo = TRUE)
+library("stats")
+library("dplyr")
+library("ggplot2")
+library("ggfortify")
+library("tidyverse")
+
+df <- read_csv2("cleaned_data.csv")
+colnames(df)
+set.seed(1)
+
+```
+
+Import data and look at columns.
+
+```{r import, include=FALSE}
+df <- read_csv2("cleaned_data.csv")
+colnames(df)
+
+```
+
+# Preprocessing
+
+The data is prepared for analysis.
+
+```{r preprocessing, echo=TRUE}
+#drop
+drop2 <- c("lfdn", "v_238", "v_211", "quality", "v_360", "v_205" , "v_290", "v_88", "v_363")
+df2 <- dplyr::select(df, -drop2)
+
+#remove rows where survey was not completed
+df2 <- subset(df2, df2$v_321 != -77)
+
+#substitute value
+df2$v_83[df2$v_83 == -77] <- 0
+df2$v_84[df2$v_84 == -77] <- 0
+df2$v_85[df2$v_85 == -77] <- 0
+df2$v_86[df2$v_86 == -77] <- 0
+df2$v_87[df2$v_87 == -77] <- 0
+df2$v_104[df2$v_104 == -77] <- 0
+df2$v_105[df2$v_105 == -77] <- 0
+
+#drop columns where not enough answers provided
+drop3 <- c("v_73", "v_74", "v_75", "v_152", "v_153", "v_154", "v_269", "v_274", "v_275", "ArbeitsplatzLuzern", "v_89", "v_90")
+df2 <- dplyr::select(df2, -drop3)
+
+#drop columns because doesnt work in PCA
+drop4 <- c("lastpage", "duration", "X1")
+df2 <- dplyr::select(df2, -drop4)
+```
+
+# Analysis with clusters
+
+## Principal component analysis
+
+```{r PCA, echo=TRUE}
+library("MASS")
+pca <- princomp(df2, scores=TRUE)
+plot(pca,main="scree plot")
+summary(pca)
+```
+
+## Clustering
+
+```{r cluster, echo=TRUE}
+## Scale data
+df2_scaled <- scale(df2, center = FALSE, scale = TRUE)
+boxplot(df2_scaled)
+
+## Distance matrix (used below)
+dp <- dist(df2_scaled)
+
+## Choose number of clusters k with scree plot
+wss <- rep(0, 20)
+for (i in 1:20) wss[i] <- sum(kmeans(df2, centers = i, nstart = 20)$withinss)
+par(mfrow = c(1,1))
+plot(1:20, wss, type = "b", xlab = "Number of groups", ylab = "Within groups sum of squares") ## 3 centers was a good choice
+## Note: If nstart=1 is used, the results can vary because of random starting configurations in kmeans
+
+## k-means 
+ckm <- kmeans(df2, centers = 5, nstart = 10)
+grpsKM <- ckm$cluster
+```
+
+There is no clear elbow point, we choose 5 groups. 
+
+```{r, echo=TRUE}
+## k-means 
+set.seed(1)
+ckm <- kmeans(df2, centers = 5, nstart = 10)
+grpsKM <- ckm$cluster
+```
+
+## View Clusters on Pricipal components
+
+```{r cluster-view, echo=TRUE}
+pc <- princomp(df2)
+par(mfrow = c(1,1))
+
+# visualize in PC 1 & 2
+pr <- pc$scores[,1:2]
+plot(pr, pch = grpsKM, col=grpsKM, lwd=2)
+legend("bottomright", legend = 1:5, pch = 1:5, col=1:5, bty="n")
+title(main = "PC1 vs PC2")
+
+# visualize in PC  2 & 3
+pr <- pc$scores[,2:3]
+plot(pr, pch = grpsKM, col=grpsKM, lwd=2)
+legend("bottomright", legend = 1:5, pch = 1:5, col=1:5, bty="n")
+title(main = "PC2 vs PC3")
+
+# visualize in PC  1 & 3
+pr <- cbind("Comp.1" = pc$scores[,1], "Comp.3" = pc$scores[,3])
+plot(pr, pch = grpsKM, col=grpsKM, lwd=2)
+legend("bottomright", legend = 1:5, pch = 1:5, col=1:5, bty="n")
+title(main = "PC1 vs PC3")
+
+```
+
+
+# Select variables and build personas
+
+## Mean of data by cluster
+
+```{r, echo=TRUE}
+df.means <- aggregate(df2, by=list(cluster=grpsKM), mean)
+```
+
+
+## Analysis of variance
+
+Here we analyse the relevant variables, meaning the ones that differ significantly between the clusters.
+
+```{r, echo=TRUE}
+df2_scaled <- as.data.frame(df2_scaled)
+df3 <- df2_scaled
+df3["cluster"] <- grpsKM
+
+
+fit <- aov(cluster ~ .-cluster, data=df3)
+summary(fit)
+```
+
+## Select and rename significant variables
+
+```{r, echo=TRUE}
+
+#note: this selection was based on a previous clustering, it will not match with the current analysis
+
+
+selection.aov <- c("Lebensqualallg",
+                   "Sex",
+                   "Altergruppe",
+                   "Quartier",
+                   "Zuzug", 
+                   "Erwerb",
+                   "v_364",
+                   "v_79",
+                   "v_357",
+                   "v_359",
+                   "v_86",
+                   "v_56",
+                   "v_305",
+                   "v_306",
+                   "v_41",
+                   "v_42",
+                   "v_50",
+                   "v_51",
+                   "v_187",
+                   "v_279",
+                   "v_280",
+                   "v_324",
+                   "v_325",
+                   "v_316",
+                   "v_106",
+                   "v_212",
+                   "v_366",
+                   "v_248")
+
+
+selection.aov2 <- c("Lebensqualallg",
+                   "Sex",
+                   "Altergruppe",
+                   "Quartier",
+                   "Zuzug", 
+                   "Erwerb",
+                   "v_294",
+                   "v_79",
+                   "v_355",
+                   "v_357",
+                   "v_302",
+                   "v_311",
+                   "v_39",
+                   "v_323",
+                   "v_325",
+                   "v_106",
+                   "v_212",
+                   "v_366",
+                   "v_367",
+                   "v_293",
+                   "v_256")
+
+
+df.aov.selected <- dplyr::select(df.means, selection.aov2)
+
+df.aov.selected.transposed <- as.data.frame(t(df.aov.selected))
+print(df.aov.selected.transposed)
+```
+
+## Plot Kinder pro Cluster
+
+```{r, echo=TRUE}
+df2["cluster"] <- grpsKM
+```
+
+```{r, echo=TRUE}
+ggplot(df2, aes(x=df2$cluster, fill = as.factor(df2$Kinder_Schule)))+
+  geom_bar()+ 
+  labs(fill='Kinder')+
+  scale_fill_discrete(labels = c("schulpflichtige Kinder", "keine schulpflichtige Kinder"))
+```
+
+## Plot Haushalt pro Cluster
+
+```{r, echo=TRUE}
+ggplot(df2, aes(x=df2$cluster, fill = as.factor(df2$HH)))+
+  geom_bar()+ 
+  labs(fill='Haushalt')+
+  scale_fill_discrete(labels = c("Einpersonenhaushalt", "Elternteil mit Kinder", "Paar ohne Kinder", "Paar mit Kinder", "anderer Mehrpersonenhaushalt"))
+```
+
+## Plot Alter pro Cluster
+
+```{r, echo=TRUE}
+ggplot(df2, aes(x=df2$cluster, fill = as.factor(df2$Altergruppe)))+
+  geom_bar()+ 
+  labs(fill='Altersgruppe')+
+  scale_fill_discrete(labels = c("0-9", "10-19", "20-29", "30-39", "40-49", "50-65", "65-84", "85+"))
+```
+
+
+## Export
+
+```{r, echo=TRUE}
+write.csv2(df.aov.selected, "df_aov_selected2.csv")
+write.csv2(df.aov.selected.transposed, "df_aov_selected_transposed2.csv")
+```
+
+
