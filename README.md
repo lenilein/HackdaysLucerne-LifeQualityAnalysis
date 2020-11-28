@@ -2,4 +2,3 @@
 #ch106_life_quality_analysis  
 
 **Data Description**
-
