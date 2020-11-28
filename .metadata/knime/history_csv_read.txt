@@ -1,0 +1,1 @@
+/Users/pouloeld/Documents/R_Projects/Quality of Life Lucerne/HackdaysLucerne-LifeQualityAnalysis/cleaned_data.csv
