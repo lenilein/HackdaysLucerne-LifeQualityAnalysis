@@ -1,5 +1,5 @@
 ---
-title: "DataChallenge_ShapeMyCity"
+title: "Data Challenge - Shape My City"
 author: "Irma Glatt"
 date: "27 11 2020"
 output:
@@ -11,27 +11,29 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Introduction
+# Part 1: City Engagement vs. Demographics
 
-In this sub part of the challenge, I want to find out if the answers given in the question "Wie engagiert sind Sie in der Gestaltung des städtischen Lebens?" can be found to be correlated with any of the main demographic factors. Therefore, I use the following variables for my analysis:
+## Introduction
+
+In the first sub part of the challenge, I want to find out if the answers given in the question "Wie engagiert sind Sie in der Gestaltung des städtischen Lebens?" can be found to be correlated with any of the main demographic factors. Therefore, I use the following variables for my analysis:
 
 Dependent variable: 
- - v_311: "Wie engagiert sind Sie in der Gestaltung des städtischen Lebens?"
+* v_311: "Wie engagiert sind Sie in der Gestaltung des städtischen Lebens?"
  
 Independent variables: 
- - v_6: Geschlecht (Sex), 
- - v_22: Altersgruppe (Altersgruppe), 
- - v_7: Beziehungsstand (Beziehungsstatus), 
- - v_113: Quartier (Quartier),
- - v_99: Lebensdauer in Luzern (Zugzug), 
- - v_142: höchster Bildungsabschluss (Bildung), 
- - v_14: Art des Haushalts (HH), 
- - v_158: Schulpflichtige Kinder (Kinder_Schule), 
- - v_15: Erwerbstätigkeit (Erwerb), 
- - v_66: Arbeitsplatz in Luzern (ArbeitsplatzLuzern)
+* v_6: Geschlecht (Sex), 
+* v_22: Altersgruppe (Altersgruppe), 
+* v_7: Beziehungsstand (Beziehungsstatus), 
+* v_113: Quartier (Quartier),
+* v_99: Lebensdauer in Luzern (Zugzug), 
+* v_142: höchster Bildungsabschluss (Bildung), 
+* v_14: Art des Haushalts (HH), 
+* v_158: Schulpflichtige Kinder (Kinder_Schule), 
+* v_15: Erwerbstätigkeit (Erwerb), 
+* v_66: Arbeitsplatz in Luzern (ArbeitsplatzLuzern)
 
 
-# Load packages
+## Load packages
 
 ```{r packages, message=FALSE, warning=FALSE}
 library(nnet) # for multinomial logistic regression
@@ -46,7 +48,7 @@ library("xlsx")
 library(randomForest)
 ```
 
-# Load and prepare data
+## Load and prepare data
 
 ```{r load and prepare data, message=FALSE}
 df <- read.csv2("./project/HackdaysLucerne-LifeQualityAnalysis/cleaned_data.CSV")
@@ -71,7 +73,7 @@ df$Kinder_Schule <- as.factor(df$Kinder_Schule)
 df$Zuzug <- ordered(df$Zuzug)
 ```
 
-# Plotting the data
+## Plotting the data
 
 ```{r plots, fig.height=12, fig.width=12}
 
@@ -142,7 +144,7 @@ annotate_figure(figure, top = "City Engagement across various Demografic Factors
 
 Just by looking at the plots, there is no obvious irregularity one can observe, that indicates a special correlation between one of the independent variables and the dependent variable.
 
-# Regression Model
+## Regression Model
 
 As the dependent variable is an ordered factor, I apply an ordered logicstic regression model. Due to the fact, that the variable *ArbeitsplatzLuzern* has many NA-values, I skip this variable for the following analysis.
 
@@ -189,7 +191,7 @@ exp(coef(glm.df_new))
 With this new model, the factors *Zuzug* and *Bildung* are slightly significant. This is in agreement to further sup parts of this challenge.
 
 
-# Classification Tree
+## Classification Tree
 
 ```{r classification tree prediction with train and test data}
 
@@ -344,3 +346,84 @@ varImpPlot (bag.df, "main"="Importance of variables")
 
 With the summarised answers, the tree shows only 6 terminal nodes. The main criteria is again the factor *Zugzug*.
 By applying bagging, one can reduce the out-of-bag estimate of error rate to 40.1%.
+
+# Part 2: Demographics of people with children
+
+In this part, we have a short look on the variable *Kinder_Schule* (1 for having children in school-age, 2 for not having children in school-age).
+
+Dependent variable:
+* v_158: Schulpflichtige Kinder (Kinder_Schule) 
+
+Independent variables:
+* v_6: Geschlecht (Sex), 
+* v_22: Altersgruppe (Altersgruppe), 
+* v_7: Beziehungsstand (Beziehungsstatus), 
+* v_113: Quartier (Quartier),
+* v_99: Lebensdauer in Luzern (Zugzug), 
+* v_142: höchster Bildungsabschluss (Bildung), 
+* v_14: Art des Haushalts (HH), 
+* v_15: Erwerbstätigkeit (Erwerb), 
+* v_66: Arbeitsplatz in Luzern (ArbeitsplatzLuzern)
+
+## Plotting the data
+
+```{r plots part 2, fig.height=10, fig.width=12}
+
+p1 <- ggplot(df, aes(Sex, ..count..)) + geom_bar(aes(fill = Kinder_Schule), position = "dodge")
+p2 <- ggplot(df, aes(Altergruppe, ..count..)) + geom_bar(aes(fill = Kinder_Schule), position = "dodge")
+p3 <- ggplot(df, aes(Beziehungstatus, ..count..)) + geom_bar(aes(fill = Kinder_Schule), position = "dodge")
+p4 <- ggplot(df, aes(Quartier, ..count..)) + geom_bar(aes(fill = Kinder_Schule), position = "dodge")
+p5 <- ggplot(df, aes(Zuzug, ..count..)) + geom_bar(aes(fill = Kinder_Schule), position = "dodge")
+p6 <- ggplot(df, aes(Bildung, ..count..)) + geom_bar(aes(fill = Kinder_Schule), position = "dodge")
+p7 <- ggplot(df, aes(HH, ..count..)) + geom_bar(aes(fill = Kinder_Schule), position = "dodge")
+p8 <- ggplot(df, aes(Erwerb, ..count..)) + geom_bar(aes(fill = Kinder_Schule), position = "dodge")
+p9 <- ggplot(df, aes(ArbeitsplatzLuzern, ..count..)) + geom_bar(aes(fill = Kinder_Schule), position = "dodge")
+
+figure <- ggarrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, nrow=3, ncol=3)
+annotate_figure(figure, top = "People with children at school age across various Demografic Factors")
+
+```
+**Interpretation**
+In the above plots the ones for HH (Haushalt) and Altersgruppe show a very clear - and not surprising - information:
+There are more people with children living in a household of the type 2 (Elternteil mit Kinder) and 4 (Paar mit Kinder) than without. And there are more people with school children in the age 40-49 than without.
+
+To find out more about possible important factors, let's have a look at classification trees.
+
+## Classification Trees
+
+```{r classification tree}
+
+set.seed(12)
+
+# define model
+tree.classification.df <- tree(Kinder_Schule ~ Sex + Altergruppe + Beziehungstatus + 
+                                 Quartier + Zuzug + Bildung + HH +  Erwerb, data = df)
+
+summary(tree.classification.df)
+plot(tree.classification.df)
+text(tree.classification.df, pretty=1, cex=0.75)
+
+# define model excluding the variable HH
+tree.classification.df <- tree(Kinder_Schule ~ Sex + Altergruppe + Beziehungstatus + 
+                                 Quartier + Zuzug + Bildung + Erwerb, data = df)
+
+summary(tree.classification.df)
+plot(tree.classification.df)
+text(tree.classification.df, pretty=1, cex=0.75)
+
+# define model excluding the variable HH and Altersgruppe
+tree.classification.df <- tree(Kinder_Schule ~ Sex + Beziehungstatus + 
+                                 Quartier + Zuzug + Bildung + Erwerb, data = df)
+
+summary(tree.classification.df)
+plot(tree.classification.df)
+text(tree.classification.df, pretty=1, cex=0.75)
+
+```
+**Interpretation**
+Without the exclusion of the variables *HH* and *Altergruppe*, the trees strongly rely on these variables. By excluding these two factors, the only people predicted to have children at school age are persons that fulfill following conditions:
+
+* live longer than 5 years in Lucerne
+* Work part-time
+* Are female
+* Live in one of the quartiers 2,3,5,6
